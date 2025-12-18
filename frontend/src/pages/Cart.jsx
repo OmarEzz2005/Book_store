@@ -1,25 +1,36 @@
+import axios from "axios";
+
 export default function Cart({ cart, setCart, currentUser, orders, setOrders }) {
   if (!currentUser) return null; // safety check
 
-  const total = cart.reduce((acc, item) => acc + item.price, 0);
+  const total = cart.reduce((acc, item) => acc + item.price * item.qty, 0);
 
-  const makeOrder = () => {
+  const makeOrder = async () => {
     if (cart.length === 0) {
       alert("Cart is empty");
       return;
     }
 
-    const newOrder = {
-      id: Date.now(),
-      customer: currentUser.username,
-      items: cart.map(item => ({ ...item })), // copy items
-      total,
-      status: "Pending",
-    };
+    try {
+      // Create sale in backend
+      const res = await axios.post(`http://localhost:5000/sales/${currentUser.customer_id}`, {
+        items: cart.map(item => ({
+          isbn: item.isbn,
+          qty: item.qty,
+          price: item.price
+        })),
+      });
 
-    setOrders([...orders, newOrder]);
-    setCart([]);
-    alert("Order placed successfully!");
+      const newOrder = res.data; // backend returns saved sale with items
+
+      // Update frontend state
+      setOrders([...orders, newOrder]);
+      setCart([]); // clear cart
+      alert("Order placed successfully!");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to place order");
+    }
   };
 
   return (
@@ -32,7 +43,8 @@ export default function Cart({ cart, setCart, currentUser, orders, setOrders }) 
         cart.map((item, i) => (
           <div key={i} className="border p-2 mb-2 rounded">
             <p className="font-semibold">{item.title}</p>
-            <p>${item.price}</p>
+            <p>Qty: {item.qty}</p>
+            <p>${item.price * item.qty}</p>
           </div>
         ))
       )}

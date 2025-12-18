@@ -1,33 +1,37 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import axios from "axios";
 
-export default function Login({ users = [], setCurrentUser }) {
+export default function Login({ setCurrentUser }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!username || !password) {
       alert("Please enter username and password");
       return;
     }
 
-    // Check if user exists
-    const user = users.find(u => u.username === username && u.password === password);
+    try {
+      // Call backend login endpoint
+      const res = await axios.post("http://localhost:5000/login", {
+        username,
+        password,
+      });
 
-    if (!user) {
+      const user = res.data;
+      setCurrentUser(user);
+
+      // Redirect based on role
+      if (user.role === "admin") {
+        navigate("/admin");
+      } else {
+        navigate("/dashboard");
+      }
+    } catch (err) {
+      console.error(err);
       alert("Invalid username or password");
-      return;
-    }
-
-    // Set logged-in user
-    setCurrentUser(user);
-
-    // Redirect based on role
-    if (user.role === "admin") {
-      navigate("/admin");
-    } else {
-      navigate("/dashboard");
     }
   };
 

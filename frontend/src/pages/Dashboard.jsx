@@ -1,21 +1,43 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import axios from "axios";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 
-export default function Dashboard({ currentUser, setCurrentUser, orders }) {
+export default function Dashboard({ currentUser, setCurrentUser }) {
   const navigate = useNavigate();
   const [editMode, setEditMode] = useState(false);
   const [showOrders, setShowOrders] = useState(false);
   const [userInfo, setUserInfo] = useState({
-    username: currentUser?.username || "",
+    username: "",
     password: "",
-    fname: currentUser?.fname || "",
-    lname: currentUser?.lname || "",
-    email: currentUser?.email || "",
-    phone: currentUser?.phone || "",
-    address: currentUser?.address || "",
+    fname: "",
+    lname: "",
+    email: "",
+    phone: "",
+    address: "",
   });
+  const [orders, setOrders] = useState([]);
+
+  // Fetch user info from DB
+  useEffect(() => {
+    if (!currentUser) return;
+
+    axios
+      .get(`http://localhost:5000/customers/${currentUser.customer_id}`)
+      .then((res) => setUserInfo({ ...res.data, password: "" }))
+      .catch((err) => console.error(err));
+  }, [currentUser]);
+
+  // Fetch user's past orders
+  useEffect(() => {
+    if (!currentUser) return;
+
+    axios
+      .get(`http://localhost:5000/sales/${currentUser.customer_id}`)
+      .then((res) => setOrders(res.data))
+      .catch((err) => console.error(err));
+  }, [currentUser]);
 
   const handleChange = (e) => {
     setUserInfo({ ...userInfo, [e.target.name]: e.target.value });
@@ -23,14 +45,16 @@ export default function Dashboard({ currentUser, setCurrentUser, orders }) {
 
   const validateFields = () => {
     const { username, password, fname, lname, email, phone, address } = userInfo;
-    if (!username || !password || !fname || !lname || !email || !phone || !address) {
+    if (!username || !fname || !lname || !email || !phone || !address) {
       alert("All fields are required.");
       return false;
     }
-    const passwordRegex = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
-    if (!passwordRegex.test(password)) {
-      alert("Password must be at least 8 characters, include one uppercase letter and one number.");
-      return false;
+    if (password) {
+      const passwordRegex = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
+      if (!passwordRegex.test(password)) {
+        alert("Password must be at least 8 characters, include one uppercase letter and one number.");
+        return false;
+      }
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
@@ -45,24 +69,33 @@ export default function Dashboard({ currentUser, setCurrentUser, orders }) {
     return true;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!validateFields()) return;
-    setCurrentUser({ ...currentUser, ...userInfo });
-    setEditMode(false);
-    alert("Information updated successfully!");
+
+    try {
+      const res = await axios.put(
+        `http://localhost:5000/customers/${currentUser.customer_id}`,
+        userInfo
+      );
+      setCurrentUser(res.data);
+      setEditMode(false);
+      alert("Information updated successfully!");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to update information.");
+    }
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
-    navigate("/login"); // Redirect to login page
+    navigate("/login");
   };
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Navbar currentUser={currentUser} cart={[]} /> {/* pass cart if needed */}
+      <Navbar currentUser={currentUser} cart={[]} />
       <main className="flex-1 bg-gray-100 p-6">
         <div className="max-w-6xl mx-auto">
-
           <h1 className="text-3xl font-bold mb-6">Customer Dashboard</h1>
 
           {/* Personal Info */}
@@ -91,7 +124,7 @@ export default function Dashboard({ currentUser, setCurrentUser, orders }) {
               </div>
             ) : (
               <div className="space-y-1">
-                <p><strong>Username:</strong> {currentUser?.username}</p>
+                <p><strong>Username:</strong> {userInfo.username}</p>
                 <p><strong>First Name:</strong> {userInfo.fname}</p>
                 <p><strong>Last Name:</strong> {userInfo.lname}</p>
                 <p><strong>Email:</strong> {userInfo.email}</p>
@@ -109,8 +142,6 @@ export default function Dashboard({ currentUser, setCurrentUser, orders }) {
 
           {/* Dashboard Sections Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-
-            {/* Browse Books */}
             <div className="bg-white p-6 rounded shadow">
               <h2 className="text-xl font-semibold mb-2">Browse Books</h2>
               <p className="text-gray-600 mb-4">Explore all available books by category, author, or publisher.</p>
@@ -122,7 +153,6 @@ export default function Dashboard({ currentUser, setCurrentUser, orders }) {
               </Link>
             </div>
 
-            {/* Shopping Cart */}
             <div className="bg-white p-6 rounded shadow">
               <h2 className="text-xl font-semibold mb-2">Shopping Cart</h2>
               <p className="text-gray-600 mb-4">View items added to your cart and proceed to checkout.</p>
@@ -134,7 +164,6 @@ export default function Dashboard({ currentUser, setCurrentUser, orders }) {
               </Link>
             </div>
 
-            {/* Logout Button */}
             <div className="bg-white p-6 rounded shadow flex flex-col justify-center items-center">
               <h2 className="text-xl font-semibold mb-2">Account</h2>
               <p className="text-gray-600 mb-4">Log out from your account.</p>
@@ -145,7 +174,6 @@ export default function Dashboard({ currentUser, setCurrentUser, orders }) {
                 Logout
               </button>
             </div>
-
           </div>
 
           {/* Past Orders Section */}
@@ -184,6 +212,5 @@ export default function Dashboard({ currentUser, setCurrentUser, orders }) {
       </main>
       <Footer />
     </div>
-    
   );
 }

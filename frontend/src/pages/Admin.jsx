@@ -1,8 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import axios from "axios";
 
-export default function Admin({ books, setBooks, orders = [], setOrders = () => {}, currentUser, setCurrentUser }) {
+export default function Admin({ currentUser, setCurrentUser }) {
+  const [books, setBooks] = useState([]);
+  const [orders, setOrders] = useState([]);
+
   const [book, setBook] = useState({
     isbn: "",
     title: "",
@@ -14,20 +18,36 @@ export default function Admin({ books, setBooks, orders = [], setOrders = () => 
     qty: "",
   });
 
-  const handleLogout = () => {
-    setCurrentUser(null);
-  };
-
   const [search, setSearch] = useState("");
   const [editId, setEditId] = useState(null);
   const [editData, setEditData] = useState({ price: "", qty: "", threshold: "" });
+
+  // Fetch books and orders on mount
+  useEffect(() => {
+    fetchBooks();
+    fetchOrders();
+  }, []);
+
+  const fetchBooks = () => {
+    axios.get("http://localhost:5000/books")
+      .then(res => setBooks(res.data))
+      .catch(err => console.error(err));
+  };
+
+  const fetchOrders = () => {
+    axios.get("http://localhost:5000/orders")
+      .then(res => setOrders(res.data))
+      .catch(err => console.error(err));
+  };
+
+  const handleLogout = () => setCurrentUser(null);
 
   // Input change for Add Book form
   const handleChange = (e) => {
     setBook({ ...book, [e.target.name]: e.target.value });
   };
 
-  // Add new book
+  // Add new book via backend
   const handleAddBook = () => {
     for (let key in book) {
       if (!book[key]) {
@@ -35,72 +55,61 @@ export default function Admin({ books, setBooks, orders = [], setOrders = () => 
         return;
       }
     }
-    setBooks([
-      ...books,
-      {
-        id: Date.now(),
-        ...book,
-        price: Number(book.price),
-        qty: Number(book.qty),
-        threshold: Number(book.threshold),
-        pub_year: Number(book.pub_year),
-      },
-    ]);
 
-    setBook({
-      isbn: "",
-      title: "",
-      price: "",
-      category: "",
-      pub_year: "",
-      publisher_id: "",
-      threshold: "",
-      qty: "",
-    });
+    axios.post("http://localhost:5000/books", book)
+      .then(res => {
+        setBooks([...books, res.data]);
+        setBook({
+          isbn: "",
+          title: "",
+          price: "",
+          category: "",
+          pub_year: "",
+          publisher_id: "",
+          threshold: "",
+          qty: "",
+        });
+      })
+      .catch(err => console.error(err));
   };
 
-  // Delete book safely
-  const handleDelete = (id) => {
-    const hasOrders = orders.some(order =>
-      order.items.some(item => item.id === id)
-    );
-    if (hasOrders) {
-      alert("Cannot delete a book with existing orders!");
-      return;
-    }
-    setBooks(books.filter(b => b.id !== id));
+  // Delete book via backend
+  const handleDelete = (isbn) => {
+    axios.delete(`http://localhost:5000/books/${isbn}`)
+      .then(() => setBooks(books.filter(b => b.isbn !== isbn)))
+      .catch(err => console.error(err));
   };
 
-  // Save edited book
-  const handleEditSave = (id) => {
-    setBooks(
-      books.map(b =>
-        b.id === id
-          ? {
-              ...b,
-              ...editData,
-              price: Number(editData.price),
-              qty: Number(editData.qty),
-              threshold: Number(editData.threshold),
-            }
-          : b
-      )
-    );
-    setEditId(null);
-    setEditData({ price: "", qty: "", threshold: "" });
+  // Save edited book via backend
+  const handleEditSave = (isbn) => {
+    axios.put(`http://localhost:5000/books/${isbn}`, editData)
+      .then(res => {
+        setBooks(books.map(b => (b.isbn === isbn ? res.data : b)));
+        setEditId(null);
+        setEditData({ price: "", qty: "", threshold: "" });
+      })
+      .catch(err => console.error(err));
   };
 
-  // Filter books
+  // Confirm or cancel order via backend
+  const handleOrderUpdate = (orderId, status) => {
+    axios.put(`http://localhost:5000/orders/${orderId}`, { status })
+      .then(res => {
+        setOrders(orders.map(o => (o.id === orderId ? res.data : o)));
+      })
+      .catch(err => console.error(err));
+  };
+
+  // Filter books by title or ISBN
   const filteredBooks = books.filter(
     b => b.title.toLowerCase().includes(search.toLowerCase()) || b.isbn.includes(search)
   );
 
   return (
     <div className="min-h-screen flex flex-col">
-       <Navbar currentUser={currentUser} />
+      <Navbar currentUser={currentUser} />
       <main className="flex-1 p-6 max-w-4xl mx-auto">
-
-         {/* Logout Button */}
+        {/* Logout Button */}
         <div className="flex justify-end mb-4">
           <button
             onClick={handleLogout}
@@ -148,7 +157,7 @@ export default function Admin({ books, setBooks, orders = [], setOrders = () => 
             <p className="text-gray-500">No books found.</p>
           ) : (
             filteredBooks.map(b => (
-              <div key={b.id} className="border p-3 rounded mb-3">
+              <div key={b.isbn} className="border p-3 rounded mb-3">
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="font-semibold">{b.title}</p>
@@ -164,7 +173,7 @@ export default function Admin({ books, setBooks, orders = [], setOrders = () => 
                     <button
                       className="text-blue-500"
                       onClick={() => {
-                        setEditId(b.id);
+                        setEditId(b.isbn);
                         setEditData({
                           price: b.price,
                           qty: b.qty,
@@ -174,13 +183,13 @@ export default function Admin({ books, setBooks, orders = [], setOrders = () => 
                     >
                       Edit
                     </button>
-                    <button className="text-red-500" onClick={() => handleDelete(b.id)}>
+                    <button className="text-red-500" onClick={() => handleDelete(b.isbn)}>
                       Delete
                     </button>
                   </div>
                 </div>
 
-                {editId === b.id && (
+                {editId === b.isbn && (
                   <div className="mt-3 space-y-2">
                     {["price", "qty", "threshold"].map(field => (
                       <input
@@ -196,7 +205,7 @@ export default function Admin({ books, setBooks, orders = [], setOrders = () => 
                     ))}
                     <button
                       className="bg-green-500 text-white px-4 py-1 rounded"
-                      onClick={() => handleEditSave(b.id)}
+                      onClick={() => handleEditSave(b.isbn)}
                     >
                       Save Changes
                     </button>
@@ -230,25 +239,13 @@ export default function Admin({ books, setBooks, orders = [], setOrders = () => 
                   <div className="mt-3 space-x-2">
                     <button
                       className="bg-green-500 text-white px-3 py-1 rounded"
-                      onClick={() =>
-                        setOrders(
-                          orders.map(o =>
-                            o.id === order.id ? { ...o, status: "Confirmed" } : o
-                          )
-                        )
-                      }
+                      onClick={() => handleOrderUpdate(order.id, "Confirmed")}
                     >
                       Confirm
                     </button>
                     <button
                       className="bg-red-500 text-white px-3 py-1 rounded"
-                      onClick={() =>
-                        setOrders(
-                          orders.map(o =>
-                            o.id === order.id ? { ...o, status: "Cancelled" } : o
-                          )
-                        )
-                      }
+                      onClick={() => handleOrderUpdate(order.id, "Cancelled")}
                     >
                       Cancel
                     </button>

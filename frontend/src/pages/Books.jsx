@@ -1,21 +1,40 @@
+import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import axios from "axios";
 
-export default function Books({ books, cart, setCart, currentUser }) {
+export default function Books({ currentUser, cart, setCart }) {
+  const [books, setBooks] = useState([]);
+
+  // Fetch books from backend
+  useEffect(() => {
+    axios.get("http://localhost:5000/books")
+      .then(res => setBooks(res.data))
+      .catch(err => console.error(err));
+  }, []);
+
   const addToCart = (book) => {
     if (!currentUser) {
       alert("Please log in to add books to cart");
       return;
     }
 
-    // Prevent adding duplicates
-    if (cart.some((item) => item.id === book.id)) {
+    // Check if already in cart
+    if (cart.some(item => item.isbn === book.isbn)) {
       alert("Book already in cart");
       return;
     }
 
-    setCart([...cart, book]);
-    alert(`${book.title} added to cart`);
+    // Call backend to add to cart
+    axios.post(`http://localhost:5000/cart/${currentUser.customer_id}`, {
+      isbn: book.isbn,
+      qty: 1
+    })
+    .then(res => {
+      setCart([...cart, res.data]); // Update cart in frontend
+      alert(`${book.title} added to cart`);
+    })
+    .catch(err => console.error(err));
   };
 
   return (
@@ -28,11 +47,13 @@ export default function Books({ books, cart, setCart, currentUser }) {
         {books.length === 0 ? (
           <p className="text-gray-500">No books available.</p>
         ) : (
-          books.map((book) => (
-            <div key={book.id} className="border p-4 mb-3 rounded">
+          books.map(book => (
+            <div key={book.isbn} className="border p-4 mb-3 rounded">
               <h2 className="font-semibold">{book.title}</h2>
-              <p className="text-gray-600">{book.author}</p>
+              <p className="text-gray-600">Publisher ID: {book.publisher_id}</p>
               <p className="font-bold">${book.price}</p>
+              <p className="text-sm">Category: {book.category}</p>
+              <p className="text-sm">Available: {book.qty}</p>
 
               <button
                 onClick={() => addToCart(book)}

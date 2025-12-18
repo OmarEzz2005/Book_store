@@ -1,31 +1,37 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import axios from "axios";
 
-export default function Signup({ users = [], setUsers }) {
+export default function Signup() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("customer");
+  const [role, setRole] = useState("customer"); // Usually admins are created manually in DB
   const navigate = useNavigate();
 
-  const handleSignup = () => {
+  const handleSignup = async () => {
     if (!username || !password) {
       alert("Please fill all fields");
       return;
     }
 
-    // Check if username already exists
-    const exists = users.some(u => u.username === username);
-    if (exists) {
-      alert("Username already exists");
-      return;
+    try {
+      // Call backend signup endpoint
+      await axios.post("http://localhost:5000/signup", {
+        username,
+        password,
+        role,
+      });
+
+      alert("User registered successfully!");
+      navigate("/"); // Redirect to login
+    } catch (err) {
+      console.error(err);
+      if (err.response?.data?.message) {
+        alert(err.response.data.message);
+      } else {
+        alert("Error registering user");
+      }
     }
-
-    // Add new user
-    setUsers([...users, { username, password, role }]);
-    alert("User registered successfully!");
-
-    // Redirect to Login
-    navigate("/");
   };
 
   return (
