@@ -42,29 +42,31 @@ app.post("/signup", (req, res) => {
     return res.status(400).json({ error: "All fields are required" });
   }
 
-  // Check if username exists in users table
-  const checkQuery = "SELECT * FROM users WHERE username = ?";
-  db.query(checkQuery, [username], (err, results) => {
+  // Step 1: Check if username exists in users table
+  db.query("SELECT * FROM users WHERE username = ?", [username], (err, results) => {
     if (err) return res.status(500).json({ error: err.message });
-    if (results.length > 0)
-      return res.status(400).json({ error: "Username already exists" });
+    if (results.length > 0) return res.status(400).json({ error: "Username already exists" });
 
-    // Insert into users table
-    const insertUsers = "INSERT INTO users (username, password, role) VALUES (?, ?, ?)";
-    db.query(insertUsers, [username, password, role], (err, result) => {
+    // Step 2: Insert into users table
+    db.query("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", [username, password, role], (err, result) => {
       if (err) return res.status(500).json({ error: err.message });
 
-      // Also insert into Admin or Customer
+      // Step 3: Insert into role-specific table
       if (role === "admin") {
-        db.query("INSERT INTO Admin (username, password) VALUES (?, ?)", [username, password]);
+        db.query("INSERT INTO Admin (username, password) VALUES (?, ?)", [username, password], (err) => {
+          if (err) return res.status(500).json({ error: err.message });
+          return res.json({ message: "Admin registered successfully" });
+        });
       } else {
         db.query(
           "INSERT INTO Customer (username, password, fname, lname, email, phone, address) VALUES (?, ?, '', '', '', '', '')",
-          [username, password]
+          [username, password],
+          (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            return res.json({ message: "Customer registered successfully" });
+          }
         );
       }
-
-      res.json({ message: "User registered successfully" });
     });
   });
 });
@@ -73,27 +75,21 @@ app.post("/signup", (req, res) => {
 // LOGIN ROUTE
 // ======================
 app.post("/login", (req, res) => {
-  const { username, password, role } = req.body;
-  if (!username || !password || !role) {
-    return res
-      .status(400)
-      .json({ error: "Username, password, and role are required" });
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: "Username and password are required" });
   }
 
-  const table = role === "admin" ? "Admin" : "Customer";
-  const idField = role === "admin" ? "admin_id" : "customer_id";
-
-  const query = `SELECT * FROM ${table} WHERE username = ? AND password = ?`;
-  db.query(query, [username, password], (err, results) => {
+  // Check credentials in users table
+  db.query("SELECT * FROM users WHERE username = ? AND password = ?", [username, password], (err, results) => {
     if (err) return res.status(500).json({ error: err.message });
-    if (results.length === 0)
-      return res.status(400).json({ error: "Invalid username or password" });
+    if (results.length === 0) return res.status(400).json({ error: "Invalid username or password" });
 
     const user = results[0];
     res.json({
-      id: user[idField],
+      id: user.id,
       username: user.username,
-      role: role,
+      role: user.role
     });
   });
 });
