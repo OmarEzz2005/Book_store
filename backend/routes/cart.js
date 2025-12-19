@@ -8,7 +8,7 @@ router.post("/", (req, res) => {
   const { cart_id, isbn, qty } = req.body;
 
   db.query(
-    "INSERT INTO Cart_Item VALUES (?,?,?)",
+    "INSERT INTO Cart_Item (cart_id, isbn, qty) VALUES (?, ?, ?)",
     [cart_id, isbn, qty],
     (err) => {
       if (err) return res.status(500).json(err);

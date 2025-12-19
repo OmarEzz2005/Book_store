@@ -19,13 +19,13 @@ export default function Dashboard({ currentUser, setCurrentUser }) {
   });
   const [orders, setOrders] = useState([]);
 
-  // Fetch user info from DB
+  // Fetch customer info from backend
   useEffect(() => {
     if (!currentUser) return;
 
     axios
-      .get(`http://localhost:5000/customers/${currentUser.customer_id}`)
-      .then((res) => setUserInfo({ ...res.data, password: "" }))
+      .get(`http://localhost:5000/customers/${currentUser.id}`)
+      .then(({ data }) => setUserInfo({ ...data, password: "" }))
       .catch((err) => console.error(err));
   }, [currentUser]);
 
@@ -34,8 +34,8 @@ export default function Dashboard({ currentUser, setCurrentUser }) {
     if (!currentUser) return;
 
     axios
-      .get(`http://localhost:5000/sales/${currentUser.customer_id}`)
-      .then((res) => setOrders(res.data))
+      .get(`http://localhost:5000/sales/${currentUser.id}`)
+      .then(({ data }) => setOrders(data))
       .catch((err) => console.error(err));
   }, [currentUser]);
 
@@ -45,7 +45,7 @@ export default function Dashboard({ currentUser, setCurrentUser }) {
 
   const validateFields = () => {
     const { username, password, fname, lname, email, phone, address } = userInfo;
-    if (!username || !fname || !lname || !email || !phone || !address) {
+    if (!username || !password || !fname || !lname || !email || !phone || !address) {
       alert("All fields are required.");
       return false;
     }
@@ -73,11 +73,12 @@ export default function Dashboard({ currentUser, setCurrentUser }) {
     if (!validateFields()) return;
 
     try {
-      const res = await axios.put(
-        `http://localhost:5000/customers/${currentUser.customer_id}`,
+      const { data } = await axios.put(
+        `http://localhost:5000/customers/${currentUser.id}`,
         userInfo
       );
-      setCurrentUser(res.data);
+      setUserInfo({ ...data, password: "" });
+      setCurrentUser({ ...currentUser, ...data });
       setEditMode(false);
       alert("Information updated successfully!");
     } catch (err) {
@@ -88,7 +89,7 @@ export default function Dashboard({ currentUser, setCurrentUser }) {
 
   const handleLogout = () => {
     setCurrentUser(null);
-    navigate("/login");
+    navigate("/");
   };
 
   return (
@@ -197,7 +198,7 @@ export default function Dashboard({ currentUser, setCurrentUser }) {
                       <p><strong>Total:</strong> ${order.total}</p>
                       <p><strong>Status:</strong> {order.status}</p>
                       <div className="mt-1">
-                        {order.items.map((item, i) => (
+                        {order.items?.map((item, i) => (
                           <p key={i} className="text-sm">- {item.title} (${item.price})</p>
                         ))}
                       </div>

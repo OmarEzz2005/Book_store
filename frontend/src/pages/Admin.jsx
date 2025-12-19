@@ -4,8 +4,10 @@ import Footer from "../components/Footer";
 import axios from "axios";
 
 export default function Admin({ currentUser, setCurrentUser }) {
+  // --- States ---
   const [books, setBooks] = useState([]);
   const [orders, setOrders] = useState([]);
+  const [publishers, setPublishers] = useState([]);
 
   const [book, setBook] = useState({
     isbn: "",
@@ -18,14 +20,22 @@ export default function Admin({ currentUser, setCurrentUser }) {
     qty: "",
   });
 
+  const [publisher, setPublisher] = useState({
+    publisher_id: "",
+    name: "",
+    address: "",
+    phone: "",
+  });
+
   const [search, setSearch] = useState("");
   const [editId, setEditId] = useState(null);
   const [editData, setEditData] = useState({ price: "", qty: "", threshold: "" });
 
-  // Fetch books and orders on mount
+  // --- Fetch data on mount ---
   useEffect(() => {
     fetchBooks();
     fetchOrders();
+    fetchPublishers();
   }, []);
 
   const fetchBooks = () => {
@@ -40,14 +50,24 @@ export default function Admin({ currentUser, setCurrentUser }) {
       .catch(err => console.error(err));
   };
 
+  const fetchPublishers = () => {
+    axios.get("http://localhost:5000/publishers")
+      .then(res => setPublishers(res.data))
+      .catch(err => console.error(err));
+  };
+
+  // --- Handlers ---
   const handleLogout = () => setCurrentUser(null);
 
-  // Input change for Add Book form
   const handleChange = (e) => {
     setBook({ ...book, [e.target.name]: e.target.value });
   };
 
-  // Add new book via backend
+  const handlePublisherChange = (e) => {
+    setPublisher({ ...publisher, [e.target.name]: e.target.value });
+  };
+
+  // --- Add Book ---
   const handleAddBook = () => {
     for (let key in book) {
       if (!book[key]) {
@@ -56,7 +76,16 @@ export default function Admin({ currentUser, setCurrentUser }) {
       }
     }
 
-    axios.post("http://localhost:5000/books", book)
+    const newBook = {
+      ...book,
+      price: Number(book.price),
+      pub_year: Number(book.pub_year),
+      threshold: Number(book.threshold),
+      qty: Number(book.qty),
+      publisher_id: Number(book.publisher_id),
+    };
+
+    axios.post("http://localhost:5000/books", newBook)
       .then(res => {
         setBooks([...books, res.data]);
         setBook({
@@ -69,18 +98,45 @@ export default function Admin({ currentUser, setCurrentUser }) {
           threshold: "",
           qty: "",
         });
+        alert("Book added successfully");
       })
-      .catch(err => console.error(err));
+      .catch(err => {
+        console.error(err);
+        const message = err.response?.data?.error || "Failed to add book";
+        alert(message);
+      });
   };
 
-  // Delete book via backend
+  // --- Add Publisher ---
+  const handleAddPublisher = () => {
+    for (let key in publisher) {
+      if (!publisher[key]) {
+        alert("All fields are required");
+        return;
+      }
+    }
+
+    axios.post("http://localhost:5000/publishers", publisher)
+      .then(res => {
+        setPublishers([...publishers, res.data]);
+        setPublisher({ publisher_id: "", name: "", address: "", phone: "" });
+        alert("Publisher added successfully");
+      })
+      .catch(err => {
+        console.error(err);
+        const message = err.response?.data?.error || "Failed to add publisher";
+        alert(message);
+      });
+  };
+
+  // --- Delete Book ---
   const handleDelete = (isbn) => {
     axios.delete(`http://localhost:5000/books/${isbn}`)
       .then(() => setBooks(books.filter(b => b.isbn !== isbn)))
       .catch(err => console.error(err));
   };
 
-  // Save edited book via backend
+  // --- Save edited book ---
   const handleEditSave = (isbn) => {
     axios.put(`http://localhost:5000/books/${isbn}`, editData)
       .then(res => {
@@ -91,7 +147,7 @@ export default function Admin({ currentUser, setCurrentUser }) {
       .catch(err => console.error(err));
   };
 
-  // Confirm or cancel order via backend
+  // --- Update Order Status ---
   const handleOrderUpdate = (orderId, status) => {
     axios.put(`http://localhost:5000/orders/${orderId}`, { status })
       .then(res => {
@@ -100,16 +156,18 @@ export default function Admin({ currentUser, setCurrentUser }) {
       .catch(err => console.error(err));
   };
 
-  // Filter books by title or ISBN
+  // --- Filter books ---
   const filteredBooks = books.filter(
     b => b.title.toLowerCase().includes(search.toLowerCase()) || b.isbn.includes(search)
   );
 
+  // --- JSX ---
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar currentUser={currentUser} />
       <main className="flex-1 p-6 max-w-4xl mx-auto">
-        {/* Logout Button */}
+
+        {/* Logout */}
         <div className="flex justify-end mb-4">
           <button
             onClick={handleLogout}
@@ -142,7 +200,28 @@ export default function Admin({ currentUser, setCurrentUser }) {
           </button>
         </div>
 
-        {/* Search */}
+        {/* Add Publisher */}
+        <div className="border p-4 rounded mb-6">
+          <h2 className="font-semibold mb-3">Add New Publisher</h2>
+          {Object.keys(publisher).map(key => (
+            <input
+              key={key}
+              className="input mb-2"
+              name={key}
+              placeholder={key.replace("_", " ").toUpperCase()}
+              value={publisher[key]}
+              onChange={handlePublisherChange}
+            />
+          ))}
+          <button
+            onClick={handleAddPublisher}
+            className="w-full bg-green-500 text-white py-2 rounded hover:bg-green-600"
+          >
+            Add Publisher
+          </button>
+        </div>
+
+        {/* Search Books */}
         <input
           className="input mb-4"
           placeholder="Search by Title or ISBN"
@@ -216,6 +295,23 @@ export default function Admin({ currentUser, setCurrentUser }) {
           )}
         </div>
 
+        {/* Publishers List */}
+        <div className="mb-10">
+          <h2 className="font-semibold mb-2">Publishers</h2>
+          {publishers.length === 0 ? (
+            <p className="text-gray-500">No publishers found.</p>
+          ) : (
+            publishers.map(p => (
+              <div key={p.publisher_id} className="border p-3 rounded mb-3">
+                <p><strong>ID:</strong> {p.publisher_id}</p>
+                <p><strong>Name:</strong> {p.name}</p>
+                <p><strong>Address:</strong> {p.address}</p>
+                <p><strong>Phone:</strong> {p.phone}</p>
+              </div>
+            ))
+          )}
+        </div>
+
         {/* Orders Management */}
         <div>
           <h2 className="text-xl font-bold mb-4">Orders</h2>
@@ -255,6 +351,7 @@ export default function Admin({ currentUser, setCurrentUser }) {
             ))
           )}
         </div>
+
       </main>
       <Footer />
     </div>

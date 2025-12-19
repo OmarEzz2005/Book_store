@@ -3,34 +3,49 @@ import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 
 export default function Signup() {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [role, setRole] = useState("customer"); // Usually admins are created manually in DB
   const navigate = useNavigate();
 
+  const [role, setRole] = useState("customer");
+
+  const [form, setForm] = useState({
+    username: "",
+    password: "",
+    fname: "",
+    lname: "",
+    email: "",
+    phone: "",
+    address: "",
+  });
+
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
   const handleSignup = async () => {
-    if (!username || !password) {
-      alert("Please fill all fields");
+    if (!form.username || !form.password) {
+      alert("Username and password are required");
+      return;
+    }
+
+    if (
+      role === "customer" &&
+      (!form.fname || !form.lname || !form.email)
+    ) {
+      alert("Please fill all customer fields");
       return;
     }
 
     try {
-      // Call backend signup endpoint
       await axios.post("http://localhost:5000/signup", {
-        username,
-        password,
+        ...form,
         role,
       });
 
-      alert("User registered successfully!");
-      navigate("/"); // Redirect to login
+      alert("Account created successfully");
+      navigate("/");
     } catch (err) {
       console.error(err);
-      if (err.response?.data?.message) {
-        alert(err.response.data.message);
-      } else {
-        alert("Error registering user");
-      }
+      alert(err.response?.data?.error || "Signup failed");
     }
   };
 
@@ -40,28 +55,71 @@ export default function Signup() {
         <h1 className="text-2xl font-bold text-center mb-6">Create Account</h1>
 
         <input
-          className="border p-2 w-full mb-4 rounded"
+          className="border p-2 w-full mb-3 rounded"
+          name="username"
           placeholder="Username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
+          value={form.username}
+          onChange={handleChange}
         />
 
         <input
-          className="border p-2 w-full mb-4 rounded"
+          className="border p-2 w-full mb-3 rounded"
           type="password"
+          name="password"
+          value={form.password}
           placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={handleChange}
         />
 
         <select
-          className="border p-2 w-full mb-4 rounded"
+          className="border p-2 w-full mb-3 rounded"
           value={role}
           onChange={(e) => setRole(e.target.value)}
         >
           <option value="customer">Customer</option>
           <option value="admin">Admin</option>
         </select>
+
+        {/* Customer-only fields */}
+        {role === "customer" && (
+          <>
+            <input
+              className="border p-2 w-full mb-3 rounded"
+              name="fname"
+              placeholder="First Name"
+              value={form.fname}
+              onChange={handleChange}
+            />
+            <input
+              className="border p-2 w-full mb-3 rounded"
+              name="lname"
+              placeholder="Last Name"
+              value={form.lname}
+              onChange={handleChange}
+            />
+            <input
+              className="border p-2 w-full mb-3 rounded"
+              name="email"
+              placeholder="Email"
+              value={form.email}
+              onChange={handleChange}
+            />
+            <input
+              className="border p-2 w-full mb-3 rounded"
+              name="phone"
+              placeholder="Phone"
+              value={form.phone}
+              onChange={handleChange}
+            />
+            <input
+              className="border p-2 w-full mb-3 rounded"
+              name="address"
+              placeholder="Address"
+              value={form.address}
+              onChange={handleChange}
+            />
+          </>
+        )}
 
         <button
           className="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600"
@@ -72,7 +130,7 @@ export default function Signup() {
 
         <p className="mt-4 text-center">
           Already have an account?{" "}
-          <Link to="/" className="text-green-600 hover:underline font-medium">
+          <Link to="/" className="text-green-600 hover:underline">
             Login
           </Link>
         </p>
