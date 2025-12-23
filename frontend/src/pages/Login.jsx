@@ -14,7 +14,6 @@ export default function Login({ setCurrentUser }) {
     }
 
     try {
-      // Call backend login endpoint
       const res = await axios.post("http://localhost:5000/login", {
         username,
         password,
@@ -23,7 +22,6 @@ export default function Login({ setCurrentUser }) {
       const user = res.data;
       setCurrentUser(user);
 
-      // Redirect based on role
       if (user.role === "admin") {
         navigate("/admin");
       } else {
@@ -36,8 +34,19 @@ export default function Login({ setCurrentUser }) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white p-8 rounded shadow-md w-full max-w-md">
+    <div
+      className="min-h-screen flex items-center justify-center relative"
+      style={{
+        backgroundImage: "url('/book_store.jpg')", 
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+      }}
+    >
+      {/* Optional overlay for better readability */}
+      <div className="absolute inset-0 bg-black opacity-40"></div>
+
+      <div className="bg-white p-8 rounded shadow-md w-full max-w-md relative z-10">
         <h1 className="text-2xl font-bold text-center mb-6">Bookstore Login</h1>
 
         <input

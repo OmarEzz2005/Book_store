@@ -18,6 +18,7 @@ app.use(cors());
 app.use(express.json());
 
 
+
 app.use("/", authRoutes);           
 app.use("/", cartRoutes);       
 app.use("/", salesRoutes);     

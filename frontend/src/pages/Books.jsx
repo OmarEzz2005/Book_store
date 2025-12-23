@@ -5,65 +5,136 @@ import axios from "axios";
 
 export default function Books({ currentUser, cart, setCart }) {
   const [books, setBooks] = useState([]);
+  const [publishers, setPublishers] = useState([]);
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [publisherFilter, setPublisherFilter] = useState("");
 
-  // Fetch books from backend
+  // Fetch books
   useEffect(() => {
     axios.get("http://localhost:5000/books")
       .then(res => setBooks(res.data))
       .catch(err => console.error(err));
+
+    axios.get("http://localhost:5000/publishers")
+      .then(res => setPublishers(res.data))
+      .catch(err => console.error(err));
   }, []);
 
   const addToCart = (book) => {
-    if (!currentUser) {
-      alert("Please log in to add books to cart");
+  if (!currentUser) {
+    alert("Please log in to add books to cart");
+    return;
+  }
+
+  if (book.qty === 0) {
+    alert("This book is out of stock");
+    return;
+  }
+
+  const existingItem = cart.find(item => item.isbn === book.isbn);
+
+  if (existingItem) {
+    if (existingItem.qty >= book.qty) {
+      alert("Cannot add more than available stock");
       return;
     }
 
-    // Check if already in cart
-    if (cart.some(item => item.isbn === book.isbn)) {
-      alert("Book already in cart");
-      return;
-    }
+    // Increment quantity by 1, but not exceeding available stock
+    setCart(cart.map(item =>
+      item.isbn === book.isbn
+        ? { ...item, qty: item.qty + 1 }
+        : item
+    ));
+  } else {
+    setCart([...cart, { isbn: book.isbn, title: book.title, price: book.price, qty: 1 }]);
+  }
 
-    // Call backend to add to cart
-    axios.post(`http://localhost:5000/cart/${currentUser.customer_id}`, {
-      isbn: book.isbn,
-      qty: 1
-    })
-    .then(res => {
-      setCart([...cart, res.data]); // Update cart in frontend
-      alert(`${book.title} added to cart`);
-    })
-    .catch(err => console.error(err));
-  };
+  alert(`${book.title} added to cart`);
+};
+
+  // Filtered books based on search and filters
+  const filteredBooks = books.filter(b =>
+    (b.title.toLowerCase().includes(search.toLowerCase()) ||
+      b.isbn.includes(search) ||
+      (b.authors || []).some(a => a.toLowerCase().includes(search.toLowerCase()))) &&
+    (categoryFilter ? b.category === categoryFilter : true) &&
+    (publisherFilter ? b.publisher_id === Number(publisherFilter) : true)
+  );
 
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar currentUser={currentUser} cart={cart} />
 
-      <main className="flex-1 p-6 max-w-3xl mx-auto">
+      <main className="flex-1 p-6">
         <h1 className="text-2xl font-bold mb-4">Books</h1>
 
-        {books.length === 0 ? (
-          <p className="text-gray-500">No books available.</p>
-        ) : (
-          books.map(book => (
-            <div key={book.isbn} className="border p-4 mb-3 rounded">
-              <h2 className="font-semibold">{book.title}</h2>
-              <p className="text-gray-600">Publisher ID: {book.publisher_id}</p>
-              <p className="font-bold">${book.price}</p>
-              <p className="text-sm">Category: {book.category}</p>
-              <p className="text-sm">Available: {book.qty}</p>
+        {/* Search & Filters */}
+        <div className="mb-4 flex flex-wrap gap-2">
+          <input
+            className="input flex-1"
+            placeholder="Search by title, ISBN, or author"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+          <select
+            className="input"
+            value={categoryFilter}
+            onChange={e => setCategoryFilter(e.target.value)}
+          >
+            <option value="">All Categories</option>
+            <option value="Science">Science</option>
+            <option value="Art">Art</option>
+            <option value="Religion">Religion</option>
+            <option value="History">History</option>
+            <option value="Geography">Geography</option>
+          </select>
+          <select
+            className="input"
+            value={publisherFilter}
+            onChange={e => setPublisherFilter(e.target.value)}
+          >
+            <option value="">All Publishers</option>
+            {publishers.map(p => (
+              <option key={p.publisher_id} value={p.publisher_id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
 
-              <button
-                onClick={() => addToCart(book)}
-                className="mt-2 bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600"
-              >
-                Add to Cart
-              </button>
-            </div>
-          ))
+        {/* Books Grid */}
+        {filteredBooks.length === 0 ? (
+          <p className="text-gray-500">No books found.</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredBooks.map(book => (
+              <div key={book.isbn} className="border p-4 rounded flex flex-col justify-between">
+                <div>
+                  <h2 className="font-semibold text-lg">{book.title}</h2>
+                  <p className="text-gray-600 text-sm">ISBN: {book.isbn}</p>
+                  <p className="text-sm">Category: {book.category}</p>
+                  <p className="text-sm">
+                    Publisher: {publishers.find(p => p.publisher_id === book.publisher_id)?.name || "Unknown"}
+                  </p>
+                  <p className="text-sm">
+                    Authors: {book.authors && book.authors.length > 0 ? book.authors.join(", ") : "N/A"}
+                  </p>
+                  <p className="font-bold mt-2">${book.price}</p>
+                  <p className="text-sm">Available: {book.qty}</p>
+                </div>
+
+                <button
+                  onClick={() => addToCart(book)}
+                  disabled={book.qty === 0}
+                  className={`mt-4 px-3 py-1 rounded text-white ${book.qty === 0 ? "bg-gray-400 cursor-not-allowed" : "bg-green-500 hover:bg-green-600"
+                    }`}
+                >
+                  {book.qty === 0 ? "Out of Stock" : "Add to Cart"}
+                </button>
+              </div>
+            ))}
+          </div>
         )}
+
       </main>
 
       <Footer />
