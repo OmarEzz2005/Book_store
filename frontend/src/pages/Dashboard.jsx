@@ -4,7 +4,7 @@ import axios from "axios";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 
-export default function Dashboard({ currentUser, setCurrentUser }) {
+export default function Dashboard({ currentUser, setCurrentUser, cart, setCart, orders, setOrders }) {
   const navigate = useNavigate();
   const [editMode, setEditMode] = useState(false);
   const [showOrders, setShowOrders] = useState(false);
@@ -17,12 +17,10 @@ export default function Dashboard({ currentUser, setCurrentUser }) {
     phone: "",
     address: "",
   });
-  const [orders, setOrders] = useState([]);
 
   // Fetch customer info from backend
   useEffect(() => {
     if (!currentUser) return;
-
     axios
       .get(`http://localhost:5000/customers/${currentUser.id}`)
       .then(({ data }) => setUserInfo({ ...data, password: "" }))
@@ -32,20 +30,17 @@ export default function Dashboard({ currentUser, setCurrentUser }) {
   // Fetch user's past orders
   useEffect(() => {
     if (!currentUser) return;
-
     axios
       .get(`http://localhost:5000/sales/${currentUser.id}`)
       .then(({ data }) => setOrders(data))
       .catch((err) => console.error(err));
-  }, [currentUser]);
+  }, [currentUser, setOrders]);
 
-  const handleChange = (e) => {
-    setUserInfo({ ...userInfo, [e.target.name]: e.target.value });
-  };
+  const handleChange = (e) => setUserInfo({ ...userInfo, [e.target.name]: e.target.value });
 
   const validateFields = () => {
     const { username, password, fname, lname, email, phone, address } = userInfo;
-    if (!username || !password || !fname || !lname || !email || !phone || !address) {
+    if (!username || !fname || !lname || !email || !phone || !address) {
       alert("All fields are required.");
       return false;
     }
@@ -71,7 +66,6 @@ export default function Dashboard({ currentUser, setCurrentUser }) {
 
   const handleSave = async () => {
     if (!validateFields()) return;
-
     try {
       const { data } = await axios.put(
         `http://localhost:5000/customers/${currentUser.id}`,
@@ -89,12 +83,13 @@ export default function Dashboard({ currentUser, setCurrentUser }) {
 
   const handleLogout = () => {
     setCurrentUser(null);
+    setCart([]); // Clear cart on logout
     navigate("/");
   };
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Navbar currentUser={currentUser} cart={[]} />
+      <Navbar currentUser={currentUser} cart={cart} />
       <main className="flex-1 bg-gray-100 p-6">
         <div className="max-w-6xl mx-auto">
           <h1 className="text-3xl font-bold mb-6">Customer Dashboard</h1>
@@ -146,43 +141,25 @@ export default function Dashboard({ currentUser, setCurrentUser }) {
             <div className="bg-white p-6 rounded shadow">
               <h2 className="text-xl font-semibold mb-2">Browse Books</h2>
               <p className="text-gray-600 mb-4">Explore all available books by category, author, or publisher.</p>
-              <Link
-                to="/books"
-                className="inline-block bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-              >
-                View Books
-              </Link>
+              <Link to="/books" className="inline-block bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">View Books</Link>
             </div>
 
             <div className="bg-white p-6 rounded shadow">
               <h2 className="text-xl font-semibold mb-2">Shopping Cart</h2>
               <p className="text-gray-600 mb-4">View items added to your cart and proceed to checkout.</p>
-              <Link
-                to="/cart"
-                className="inline-block bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
-              >
-                Go to Cart
-              </Link>
+              <Link to="/cart" className="inline-block bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Go to Cart</Link>
             </div>
 
             <div className="bg-white p-6 rounded shadow flex flex-col justify-center items-center">
               <h2 className="text-xl font-semibold mb-2">Account</h2>
               <p className="text-gray-600 mb-4">Log out from your account.</p>
-              <button
-                onClick={handleLogout}
-                className="bg-red-500 text-white px-6 py-2 rounded hover:bg-red-600"
-              >
-                Logout
-              </button>
+              <button onClick={handleLogout} className="bg-red-500 text-white px-6 py-2 rounded hover:bg-red-600">Logout</button>
             </div>
           </div>
 
           {/* Past Orders Section */}
           <div className="bg-white p-6 rounded shadow">
-            <div
-              className="flex items-center cursor-pointer mb-4"
-              onClick={() => setShowOrders(!showOrders)}
-            >
+            <div className="flex items-center cursor-pointer mb-4" onClick={() => setShowOrders(!showOrders)}>
               <h2 className="text-xl font-semibold">Past Orders</h2>
               <span className="ml-2 text-gray-500">{showOrders ? "▲" : "▼"}</span>
             </div>
@@ -208,7 +185,6 @@ export default function Dashboard({ currentUser, setCurrentUser }) {
               </div>
             )}
           </div>
-
         </div>
       </main>
       <Footer />

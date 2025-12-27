@@ -10,55 +10,85 @@ export default function Books({ currentUser, cart, setCart }) {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [publisherFilter, setPublisherFilter] = useState("");
 
-  // Fetch books
   useEffect(() => {
+    fetchBooks();
+    fetchPublishers();
+  }, []);
+
+  const fetchBooks = () => {
     axios.get("http://localhost:5000/books")
       .then(res => setBooks(res.data))
       .catch(err => console.error(err));
+  };
 
+  const fetchPublishers = () => {
     axios.get("http://localhost:5000/publishers")
       .then(res => setPublishers(res.data))
       .catch(err => console.error(err));
-  }, []);
+  };
 
+
+
+const categories = {
+  1: "Science",
+  2: "Art",
+  3: "Religion",
+  4: "History",
+  5: "Geography"
+};
+
+
+
+
+  
   const addToCart = (book) => {
-  if (!currentUser) {
-    alert("Please log in to add books to cart");
-    return;
-  }
-
-  if (book.qty === 0) {
-    alert("This book is out of stock");
-    return;
-  }
-
-  const existingItem = cart.find(item => item.isbn === book.isbn);
-
-  if (existingItem) {
-    if (existingItem.qty >= book.qty) {
-      alert("Cannot add more than available stock");
+    if (!currentUser) {
+      alert("Please log in to add books to cart");
       return;
     }
 
-    // Increment quantity by 1, but not exceeding available stock
-    setCart(cart.map(item =>
-      item.isbn === book.isbn
-        ? { ...item, qty: item.qty + 1 }
-        : item
-    ));
-  } else {
-    setCart([...cart, { isbn: book.isbn, title: book.title, price: book.price, qty: 1 }]);
-  }
+    if (book.qty === 0) {
+      alert("This book is out of stock");
+      return;
+    }
 
-  alert(`${book.title} added to cart`);
-};
+    // Check if book is already in cart
+    const existingItem = cart.find(item => item.isbn === book.isbn);
 
-  // Filtered books based on search and filters
+    if (existingItem) {
+      if (existingItem.qty >= book.qty) {
+        alert("Cannot add more than available stock");
+        return;
+      }
+
+      const updatedCart = cart.map(item =>
+        item.isbn === book.isbn ? { ...item, qty: item.qty + 1 } : item
+      );
+      setCart(updatedCart);
+
+      // Update backend cart
+      axios.put(`http://localhost:5000/cart/${currentUser.id}`, { isbn: book.isbn, qty: 1 })
+        .catch(err => console.error(err));
+    }  else {
+  const newItem = { isbn: book.isbn, title: book.title, price: book.price, qty: 1 };
+  setCart([...cart, newItem]);
+
+  // Add to backend cart - send correct fields
+  axios.post("http://localhost:5000/cart", {
+    cart_id: currentUser.id,  // <-- required
+    isbn: book.isbn,
+    qty: 1
+  }).catch(err => console.error(err));
+}
+
+    alert(`${book.title} added to cart`);
+  };
+
   const filteredBooks = books.filter(b =>
     (b.title.toLowerCase().includes(search.toLowerCase()) ||
       b.isbn.includes(search) ||
       (b.authors || []).some(a => a.toLowerCase().includes(search.toLowerCase()))) &&
-    (categoryFilter ? b.category === categoryFilter : true) &&
+    (categoryFilter ? b.cat_id === Number(categoryFilter) : true) &&
     (publisherFilter ? b.publisher_id === Number(publisherFilter) : true)
   );
 
@@ -78,17 +108,21 @@ export default function Books({ currentUser, cart, setCart }) {
             onChange={e => setSearch(e.target.value)}
           />
           <select
-            className="input"
-            value={categoryFilter}
-            onChange={e => setCategoryFilter(e.target.value)}
-          >
-            <option value="">All Categories</option>
-            <option value="Science">Science</option>
-            <option value="Art">Art</option>
-            <option value="Religion">Religion</option>
-            <option value="History">History</option>
-            <option value="Geography">Geography</option>
-          </select>
+  className="input"
+  value={categoryFilter}
+  onChange={e => setCategoryFilter(e.target.value)}
+>
+  <option value="">All Categories</option>
+  {[
+    { id: 1, name: "Science" },
+    { id: 2, name: "Art" },
+    { id: 3, name: "Religion" },
+    { id: 4, name: "History" },
+    { id: 5, name: "Geography" }
+  ].map(cat => (
+    <option key={cat.id} value={cat.id}>{cat.name}</option>
+  ))}
+</select>
           <select
             className="input"
             value={publisherFilter}
@@ -111,7 +145,7 @@ export default function Books({ currentUser, cart, setCart }) {
                 <div>
                   <h2 className="font-semibold text-lg">{book.title}</h2>
                   <p className="text-gray-600 text-sm">ISBN: {book.isbn}</p>
-                  <p className="text-sm">Category: {book.category}</p>
+                  <p className="text-sm">Category: {categories[book.cat_id] || "N/A"}</p>
                   <p className="text-sm">
                     Publisher: {publishers.find(p => p.publisher_id === book.publisher_id)?.name || "Unknown"}
                   </p>
@@ -125,8 +159,7 @@ export default function Books({ currentUser, cart, setCart }) {
                 <button
                   onClick={() => addToCart(book)}
                   disabled={book.qty === 0}
-                  className={`mt-4 px-3 py-1 rounded text-white ${book.qty === 0 ? "bg-gray-400 cursor-not-allowed" : "bg-green-500 hover:bg-green-600"
-                    }`}
+                  className={`mt-4 px-3 py-1 rounded text-white ${book.qty === 0 ? "bg-gray-400 cursor-not-allowed" : "bg-green-500 hover:bg-green-600"}`}
                 >
                   {book.qty === 0 ? "Out of Stock" : "Add to Cart"}
                 </button>
@@ -134,7 +167,6 @@ export default function Books({ currentUser, cart, setCart }) {
             ))}
           </div>
         )}
-
       </main>
 
       <Footer />

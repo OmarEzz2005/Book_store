@@ -3,25 +3,74 @@ import { db } from "../db.js";
 
 const router = express.Router();
 
-// GET all publishers
 router.get("/", (req, res) => {
-  db.query("SELECT * FROM Publisher", (err, data) => {
-    if (err) return res.status(500).json(err);
-    res.json(data);
+  db.query("SELECT * FROM Publisher", (err, results) => {
+    if (err) return res.status(500).json({ error: "Database error", details: err });
+    res.json(results);
   });
 });
 
-// ADD publisher
+// -------------------------
+// GET single publisher by ID
+// -------------------------
+router.get("/:id", (req, res) => {
+  const { id } = req.params;
+  db.query("SELECT * FROM Publisher WHERE publisher_id = ?", [id], (err, results) => {
+    if (err) return res.status(500).json({ error: "Database error", details: err });
+    if (results.length === 0) return res.status(404).json({ error: "Publisher not found" });
+    res.json(results[0]);
+  });
+});
+
+// -------------------------
+// CREATE a new publisher
+// -------------------------
 router.post("/", (req, res) => {
-  const { publisher_id, name, address, phone } = req.body;
-  if (!publisher_id || !name || !address || !phone) {
+  const { name, address, phone } = req.body;
+  if (!name || !address || !phone) {
     return res.status(400).json({ error: "All fields are required" });
   }
 
-  const newPublisher = { publisher_id, name, address, phone };
-  db.query("INSERT INTO Publisher SET ?", newPublisher, (err) => {
-    if (err) return res.status(500).json({ error: "Failed to add publisher", details: err });
-    res.status(201).json(newPublisher);
+  db.query(
+    "INSERT INTO Publisher (name, address, phone) VALUES (?, ?, ?)",
+    [name, address, phone],
+    (err, result) => {
+      if (err) return res.status(500).json({ error: "Database error", details: err });
+      res.json({ publisher_id: result.insertId, name, address, phone });
+    }
+  );
+});
+
+// -------------------------
+// UPDATE an existing publisher
+// -------------------------
+router.put("/:id", (req, res) => {
+  const { id } = req.params;
+  const { name, address, phone } = req.body;
+
+  if (!name || !address || !phone) {
+    return res.status(400).json({ error: "All fields are required" });
+  }
+
+  db.query(
+    "UPDATE Publisher SET name = ?, address = ?, phone = ? WHERE publisher_id = ?",
+    [name, address, phone, id],
+    (err, result) => {
+      if (err) return res.status(500).json({ error: "Database error", details: err });
+      if (result.affectedRows === 0) return res.status(404).json({ error: "Publisher not found" });
+      res.json({ publisher_id: Number(id), name, address, phone });
+    }
+  );
+});
+
+
+router.delete("/:id", (req, res) => {
+  const { id } = req.params;
+
+  db.query("DELETE FROM Publisher WHERE publisher_id = ?", [id], (err, result) => {
+    if (err) return res.status(500).json({ error: "Database error", details: err });
+    if (result.affectedRows === 0) return res.status(404).json({ error: "Publisher not found" });
+    res.json({ message: "Publisher deleted successfully" });
   });
 });
 

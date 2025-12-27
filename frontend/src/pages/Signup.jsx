@@ -4,8 +4,8 @@ import axios from "axios";
 
 export default function Signup() {
   const navigate = useNavigate();
-
   const [role, setRole] = useState("customer");
+  const [loading, setLoading] = useState(false);
 
   const [form, setForm] = useState({
     username: "",
@@ -21,31 +21,61 @@ export default function Signup() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleSignup = async () => {
-    if (!form.username || !form.password) {
+  const validateFields = () => {
+    const { username, password, fname, lname, email, phone, address } = form;
+    
+    if (!username.trim() || !password.trim()) {
       alert("Username and password are required");
-      return;
+      return false;
     }
 
-    if (
-      role === "customer" &&
-      (!form.fname || !form.lname || !form.email)
-    ) {
-      alert("Please fill all customer fields");
-      return;
+    if (role === "customer") {
+      if (!fname.trim() || !lname.trim() || !email.trim() || !phone.trim() || !address.trim()) {
+        alert("Please fill all customer fields");
+        return false;
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        alert("Please enter a valid email address");
+        return false;
+      }
+
+      const phoneRegex = /^[0-9]{7,}$/;
+      if (!phoneRegex.test(phone)) {
+        alert("Phone number must contain only numbers and be at least 7 digits");
+        return false;
+      }
     }
 
+    if (password) {
+      const passwordRegex = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
+      if (!passwordRegex.test(password)) {
+        alert("Password must be at least 8 characters, include one uppercase letter and one number");
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  const handleSignup = async () => {
+    if (!validateFields()) return;
+
+    setLoading(true);
     try {
-      await axios.post("http://localhost:5000/signup", {
+      await axios.post("http://localhost:5000/auth/signup", {
         ...form,
         role,
       });
 
-      alert("Account created successfully");
+      alert("Account created successfully!");
       navigate("/");
     } catch (err) {
       console.error(err);
       alert(err.response?.data?.error || "Signup failed");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -60,6 +90,7 @@ export default function Signup() {
           placeholder="Username"
           value={form.username}
           onChange={handleChange}
+          aria-label="Username"
         />
 
         <input
@@ -69,12 +100,14 @@ export default function Signup() {
           value={form.password}
           placeholder="Password"
           onChange={handleChange}
+          aria-label="Password"
         />
 
         <select
           className="border p-2 w-full mb-3 rounded"
           value={role}
           onChange={(e) => setRole(e.target.value)}
+          aria-label="Role"
         >
           <option value="customer">Customer</option>
           <option value="admin">Admin</option>
@@ -122,10 +155,13 @@ export default function Signup() {
         )}
 
         <button
-          className="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600"
+          className={`w-full py-2 rounded text-white ${
+            loading ? "bg-gray-400 cursor-not-allowed" : "bg-blue-500 hover:bg-blue-600"
+          }`}
           onClick={handleSignup}
+          disabled={loading}
         >
-          Sign Up
+          {loading ? "Signing up..." : "Sign Up"}
         </button>
 
         <p className="mt-4 text-center">

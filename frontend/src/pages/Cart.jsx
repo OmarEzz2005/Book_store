@@ -2,54 +2,75 @@ import { useState } from "react";
 import axios from "axios";
 
 export default function Cart({ cart, setCart, currentUser, orders, setOrders }) {
-
-  // Hooks first (RULE OF HOOKS ✅)
   const [cardNumber, setCardNumber] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
 
+
   if (!currentUser) return null;
 
-  const total = cart.reduce(
-    (acc, item) => acc + item.price * item.qty,
-    0
-  );
+  const total = cart.reduce((acc, item) => acc + item.price * item.qty, 0);
 
   // --------------------
-  // Cart Manipulation
+  // Cart Manipulation with Backend Sync
   // --------------------
+ const increaseQty = async (isbn, title, price) => {
+  const item = cart.find(i => i.isbn === isbn);
 
-  const increaseQty = (isbn) => {
-    setCart(cart.map(item =>
-      item.isbn === isbn
-        ? { ...item, qty: item.qty + 1 }
-        : item
+  try {
+    if (item) {
+      // Update existing item
+      await axios.put(`http://localhost:5000/cart/${currentUser.id}`, { isbn, qty: 1 });
+      setCart(cart.map(i => i.isbn === isbn ? { ...i, qty: i.qty + 1 } : i));
+    } else {
+      // Item not in cart, add it
+      await axios.post(`http://localhost:5000/cart`, { cart_id: currentUser.id, isbn, qty: 1 });
+      setCart([...cart, { isbn, title, price, qty: 1 }]);
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Cannot increase quantity. Maybe stock limit reached.");
+  }
+};
+
+
+const decreaseQty = async (isbn) => {
+  try {
+    await axios.put(`http://localhost:5000/cart/${currentUser.id}`, { isbn, qty: -1 });
+
+    setCart(cart.map(i =>
+      i.isbn === isbn ? { ...i, qty: Math.max(i.qty - 1, 1) } : i
     ));
-  };
+  } catch (err) {
+    console.error(err);
+    alert("Cannot decrease quantity.");
+  }
+};
 
-  const decreaseQty = (isbn) => {
-    setCart(cart.map(item =>
-      item.isbn === isbn && item.qty > 1
-        ? { ...item, qty: item.qty - 1 }
-        : item
-    ));
-  };
 
-  const removeItem = (isbn) => {
-    setCart(cart.filter(item => item.isbn !== isbn));
+
+
+
+  const removeItem = async (isbn) => {
+    try {
+      await axios.delete(`http://localhost:5000/cart/${currentUser.id}/${isbn}`);
+      setCart(cart.filter(i => i.isbn !== isbn));
+    } catch (err) {
+      console.error(err);
+      alert("Failed to remove item from cart");
+    }
   };
 
   // --------------------
   // Credit Card Validation
   // --------------------
-
   const validateCard = () => {
     if (cardNumber.length !== 16 || isNaN(cardNumber)) {
       alert("Invalid credit card number");
       return false;
     }
-
     const today = new Date();
-    const exp = new Date(expiryDate);
+    const [year, month] = expiryDate.split("-").map(Number);
+    const exp = new Date(year, month - 1);
 
     if (exp <= today) {
       alert("Credit card is expired");
@@ -62,46 +83,35 @@ export default function Cart({ cart, setCart, currentUser, orders, setOrders }) 
   // --------------------
   // Checkout
   // --------------------
-
   const checkout = async () => {
-    if (cart.length === 0) {
-      alert("Cart is empty");
-      return;
-    }
+  if (cart.length === 0) return alert("Cart is empty");
+  if (!validateCard()) return;
 
-    if (!validateCard()) return;
+if (!currentUser?.id) return alert("User not logged in");
 
-    try {
-      const res = await axios.post(
-        `http://localhost:5000/sales/${currentUser.customer_id}`,
-        {
-          creditCard: cardNumber,
-          expiryDate,
-          items: cart.map(item => ({
-            isbn: item.isbn,
-            qty: item.qty,
-            price: item.price,
-          })),
-        }
-      );
 
-      const newOrder = res.data;
+  try {
+    const res = await axios.post(
+      "http://localhost:5000/orders/checkout",
+      {
+        customer_id: currentUser.id,
+        credit_card_no: cardNumber,
+        expiry_date: expiryDate
+      }
+    );
 
-      setOrders([...orders, newOrder]);
-      setCart([]); // clear cart
-      setCardNumber("");
-      setExpiryDate("");
+    const newOrder = res.data;
+    setOrders([...orders, newOrder]);
+    setCart([]);
+    setCardNumber("");
+    setExpiryDate("");
+    alert("Order placed successfully!");
+  } catch (err) {
+    console.error(err);
+    alert(err.response?.data?.error || "Checkout failed");
+  }
+};
 
-      alert("Order placed successfully!");
-    } catch (err) {
-      console.error(err);
-      alert("Checkout failed");
-    }
-  };
-
-  // --------------------
-  // UI
-  // --------------------
 
   return (
     <main className="p-6 max-w-md mx-auto">
@@ -110,39 +120,19 @@ export default function Cart({ cart, setCart, currentUser, orders, setOrders }) 
       {cart.length === 0 ? (
         <p className="text-gray-500">Your cart is empty.</p>
       ) : (
-        cart.map((item) => (
+        cart.map(item => (
           <div key={item.isbn} className="border p-3 mb-3 rounded">
             <p className="font-semibold">{item.title}</p>
             <p className="text-sm">Price: ${item.price}</p>
 
             <div className="flex items-center gap-2 mt-2">
-              <button
-                className="px-2 bg-gray-300 rounded"
-                onClick={() => decreaseQty(item.isbn)}
-              >
-                −
-              </button>
-
+              <button className="px-2 bg-gray-300 rounded" onClick={() => decreaseQty(item.isbn)}>−</button>
               <span>{item.qty}</span>
-
-              <button
-                className="px-2 bg-gray-300 rounded"
-                onClick={() => increaseQty(item.isbn)}
-              >
-                +
-              </button>
-
-              <button
-                className="ml-auto text-red-500"
-                onClick={() => removeItem(item.isbn)}
-              >
-                Remove
-              </button>
+              <button className="px-2 bg-gray-300 rounded" onClick={() => increaseQty(item.isbn)}>+</button>
+              <button className="ml-auto text-red-500" onClick={() => removeItem(item.isbn)}>Remove</button>
             </div>
 
-            <p className="text-right mt-2 font-semibold">
-              Subtotal: ${item.price * item.qty}
-            </p>
+            <p className="text-right mt-2 font-semibold">Subtotal: ${item.price * item.qty}</p>
           </div>
         ))
       )}
@@ -158,7 +148,6 @@ export default function Cart({ cart, setCart, currentUser, orders, setOrders }) 
           value={cardNumber}
           onChange={e => setCardNumber(e.target.value)}
         />
-
         <input
           className="input w-full"
           type="month"

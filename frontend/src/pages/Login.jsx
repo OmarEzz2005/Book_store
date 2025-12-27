@@ -5,18 +5,24 @@ import axios from "axios";
 export default function Login({ setCurrentUser }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async () => {
-    if (!username || !password) {
+    const trimmedUsername = username.trim();
+    const trimmedPassword = password.trim();
+
+    if (!trimmedUsername || !trimmedPassword) {
       alert("Please enter username and password");
       return;
     }
 
+    setLoading(true);
+
     try {
-      const res = await axios.post("http://localhost:5000/login", {
-        username,
-        password,
+      const res = await axios.post("http://localhost:5000/auth/login", {
+        username: trimmedUsername,
+        password: trimmedPassword,
       });
 
       const user = res.data;
@@ -29,7 +35,9 @@ export default function Login({ setCurrentUser }) {
       }
     } catch (err) {
       console.error(err);
-      alert("Invalid username or password");
+      alert(err.response?.data?.message || "Invalid username or password");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -37,13 +45,13 @@ export default function Login({ setCurrentUser }) {
     <div
       className="min-h-screen flex items-center justify-center relative"
       style={{
-        backgroundImage: "url('/book_store.jpg')", 
+        backgroundImage: "url('/book_store.jpg')",
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
       }}
     >
-      {/* Optional overlay for better readability */}
+      {/* Overlay for readability */}
       <div className="absolute inset-0 bg-black opacity-40"></div>
 
       <div className="bg-white p-8 rounded shadow-md w-full max-w-md relative z-10">
@@ -54,6 +62,7 @@ export default function Login({ setCurrentUser }) {
           placeholder="Username"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
+          aria-label="Username"
         />
 
         <input
@@ -62,13 +71,19 @@ export default function Login({ setCurrentUser }) {
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          aria-label="Password"
         />
 
         <button
-          className="w-full bg-green-500 text-white py-2 rounded hover:bg-green-600"
           onClick={handleLogin}
+          disabled={loading}
+          className={`w-full py-2 rounded text-white ${
+            loading
+              ? "bg-gray-400 cursor-not-allowed"
+              : "bg-green-500 hover:bg-green-600"
+          }`}
         >
-          Login
+          {loading ? "Logging in..." : "Login"}
         </button>
 
         <p className="mt-4 text-center">
